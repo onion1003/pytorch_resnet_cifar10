@@ -12,6 +12,8 @@ import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import resnet
 
+device = torch.device('cuda:0')
+
 # 寻找 resnet.py 中的模型名字
 model_names = sorted(name for name in resnet.__dict__
     if name.islower() and not name.startswith("__")
@@ -66,7 +68,7 @@ def main():
         os.makedirs(args.save_dir)
 
     model = torch.nn.DataParallel(resnet.__dict__[args.arch]())
-    model.cuda()
+    model.to(device)
 
     # optionally resume from a checkpoint
     if args.resume:
@@ -105,7 +107,7 @@ def main():
         num_workers=args.workers, pin_memory=True)
 
     # define loss function (criterion) and pptimizer
-    criterion = nn.CrossEntropyLoss().cuda()
+    criterion = nn.CrossEntropyLoss().to(device)
 
     if args.half:
         model.half()
@@ -173,9 +175,9 @@ def train(train_loader, model, criterion, optimizer, epoch):
         # measure data loading time
         data_time.update(time.time() - end)
 
-        target = target.cuda(async=True)
-        input_var = torch.autograd.Variable(input).cuda()
-        target_var = torch.autograd.Variable(target)
+        target = target.to(device)
+        input_var = input.to(device)
+        target_var = target.to(device)
         if args.half:
             input_var = input_var.half()
 
@@ -212,55 +214,56 @@ def train(train_loader, model, criterion, optimizer, epoch):
 
 
 def validate(val_loader, model, criterion):
-    """
-    Run evaluation
-    """
-    batch_time = AverageMeter()
-    losses = AverageMeter()
-    top1 = AverageMeter()
+    with torch.no_grad:
+        """
+        Run evaluation
+        """
+        batch_time = AverageMeter()
+        losses = AverageMeter()
+        top1 = AverageMeter()
 
-    # switch to evaluate mode
-    model.eval()
+        # switch to evaluate mode
+        model.eval()
 
-    end = time.time()
-    for i, (input, target) in enumerate(val_loader):
-        target = target.cuda(async=True)
-        input_var = torch.autograd.Variable(input, volatile=True).cuda()
-        target_var = torch.autograd.Variable(target, volatile=True)
-
-        if args.half:
-            input_var = input_var.half()
-
-        # compute output
-        output = model(input_var)
-        loss = criterion(output, target_var)
-
-        output = output.float()
-        loss = loss.float()
-
-        # measure accuracy and record loss
-        prec1 = accuracy(output.data, target)[0]
-        # losses.update(loss.data[0], input.size(0))
-        losses.update(loss.data, input.size(0))
-        # top1.update(prec1[0], input.size(0))
-        top1.update(prec1, input.size(0))
-
-        # measure elapsed time
-        batch_time.update(time.time() - end)
         end = time.time()
+        for i, (input, target) in enumerate(val_loader):
+            target = target.to(device)
+            input_var = input.to(device)
+            target_var = target.to(device)
 
-        if i % args.print_freq == 0:
-            print('Test: [{0}/{1}]\t'
-                  'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
-                  'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
-                  'Prec@1 {top1.val:.3f} ({top1.avg:.3f})'.format(
-                      i, len(val_loader), batch_time=batch_time, loss=losses,
-                      top1=top1))
+            if args.half:
+                input_var = input_var.half()
 
-    print(' * Prec@1 {top1.avg:.3f}'
-          .format(top1=top1))
+            # compute output
+            output = model(input_var)
+            loss = criterion(output, target_var)
 
-    return top1.avg
+            output = output.float()
+            loss = loss.float()
+
+            # measure accuracy and record loss
+            prec1 = accuracy(output.data, target)[0]
+            # losses.update(loss.data[0], input.size(0))
+            losses.update(loss.data, input.size(0))
+            # top1.update(prec1[0], input.size(0))
+            top1.update(prec1, input.size(0))
+
+            # measure elapsed time
+            batch_time.update(time.time() - end)
+            end = time.time()
+
+            if i % args.print_freq == 0:
+                print('Test: [{0}/{1}]\t'
+                      'Time {batch_time.val:.3f} ({batch_time.avg:.3f})\t'
+                      'Loss {loss.val:.4f} ({loss.avg:.4f})\t'
+                      'Prec@1 {top1.val:.3f} ({top1.avg:.3f})'.format(
+                          i, len(val_loader), batch_time=batch_time, loss=losses,
+                          top1=top1))
+
+        print(' * Prec@1 {top1.avg:.3f}'
+              .format(top1=top1))
+
+        return top1.avg
 
 def save_checkpoint(state, is_best, filename='checkpoint.pth.tar'):
     """
