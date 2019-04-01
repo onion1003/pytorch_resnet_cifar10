@@ -193,9 +193,9 @@ def train(train_loader, model, criterion, optimizer, epoch):
         output = output.float()
         loss = loss.float()
         # measure accuracy and record loss
-        prec1 = accuracy(output.data, target)[0]
-        # losses.update(loss.data[0], input.size(0))
-        losses.update(loss.data, input.size(0))
+        prec1 = accuracy(output.detach(), target)[0]
+        # losses.update(loss.detach()[0], input.size(0))
+        losses.update(loss.detach(), input.size(0))
         # top1.update(prec1[0], input.size(0))
         top1.update(prec1, input.size(0))
 
@@ -242,9 +242,9 @@ def validate(val_loader, model, criterion):
             loss = loss.float()
 
             # measure accuracy and record loss
-            prec1 = accuracy(output.data, target)[0]
-            # losses.update(loss.data[0], input.size(0))
-            losses.update(loss.data, input.size(0))
+            prec1 = accuracy(output.detach(), target)[0]
+            # losses.update(loss.detach()[0], input.size(0))
+            losses.update(loss.detach(), input.size(0))
             # top1.update(prec1[0], input.size(0))
             top1.update(prec1, input.size(0))
 
