@@ -12,6 +12,7 @@ import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import resnet
 
+# 寻找 resnet.py 中的模型名字
 model_names = sorted(name for name in resnet.__dict__
     if name.islower() and not name.startswith("__")
                      and name.startswith("resnet")
@@ -191,8 +192,10 @@ def train(train_loader, model, criterion, optimizer, epoch):
         loss = loss.float()
         # measure accuracy and record loss
         prec1 = accuracy(output.data, target)[0]
-        losses.update(loss.data[0], input.size(0))
-        top1.update(prec1[0], input.size(0))
+        # losses.update(loss.data[0], input.size(0))
+        losses.update(loss.data, input.size(0))
+        # top1.update(prec1[0], input.size(0))
+        top1.update(prec1, input.size(0))
 
         # measure elapsed time
         batch_time.update(time.time() - end)
@@ -237,8 +240,10 @@ def validate(val_loader, model, criterion):
 
         # measure accuracy and record loss
         prec1 = accuracy(output.data, target)[0]
-        losses.update(loss.data[0], input.size(0))
-        top1.update(prec1[0], input.size(0))
+        # losses.update(loss.data[0], input.size(0))
+        losses.update(loss.data, input.size(0))
+        # top1.update(prec1[0], input.size(0))
+        top1.update(prec1, input.size(0))
 
         # measure elapsed time
         batch_time.update(time.time() - end)
