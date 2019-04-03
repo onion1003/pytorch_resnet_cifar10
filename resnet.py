@@ -48,8 +48,45 @@ class LambdaLayer(nn.Module):
         self.lambd = lambd
 
     def forward(self, x):
+        # print(x.shape)
         return self.lambd(x)
 
+from tqdm import tqdm
+import gc
+class SyncLayer(nn.Module):
+    def __int__(self):
+        super(SyncLayer, self).__init__()
+
+    def syc(self, x):
+        # x = x.cpu()
+        k = 0.1
+        p_size = x.shape[3]
+        x = x.view(x.shape[0], x.shape[1], -1)
+        n_pixel = x.shape[2]
+        N = n_pixel * n_pixel
+
+        x_copy = x.clone().detach()
+        x_copy = x_copy.cuda()
+        for i in tqdm(range(n_pixel)):
+            tmp = torch.zeros(x_copy[:,:,i].size())
+
+            tmp = tmp.cuda()
+            # tmp = 0
+            for j in range(n_pixel):
+                if i != j:
+                    tmp +=  torch.sin(x[:,:,j]-x[:,:,i])
+            # tmp.detach()
+            print(tmp)
+            x_copy[:,:,i] = tmp*k/N
+        # x_copy.detach()
+        x = x_copy
+        x = x.view(x.shape[0], x.shape[1], p_size, p_size)
+        # x = x.cuda()
+        return x
+
+    def forward(self, x):
+        out = self.syc(x)
+        return out
 
 class BasicBlock(nn.Module):
     expansion = 1
@@ -62,11 +99,15 @@ class BasicBlock(nn.Module):
         self.bn2 = nn.BatchNorm2d(planes)
 
         self.shortcut = nn.Sequential()
+        self.sync = SyncLayer()
         if stride != 1 or in_planes != planes:
             if option == 'A':
                 """
                 For CIFAR10 ResNet paper uses option A.
                 """
+                # print(in_planes)
+                print(planes)
+
                 self.shortcut = LambdaLayer(lambda x:
                                             F.pad(x[:, :, ::2, ::2], (0, 0, 0, 0, planes//4, planes//4), "constant", 0))
             elif option == 'B':
@@ -78,8 +119,22 @@ class BasicBlock(nn.Module):
     def forward(self, x):
         out = F.relu(self.bn1(self.conv1(x)))
         out = self.bn2(self.conv2(out))
+        # print(x[:, :, ::2, ::2].shape)
+        # print(x.shape)
+        # print(out.shape)
+        out = self.sync(out)
         out += self.shortcut(x)
+
+        # print(out.shape)
+
+        # print(self.shortcut(x)[0])
+        # print(out.shape)
+
+        # sys
         out = F.relu(out)
+        # [128, 16, 32, 32]
+        # [128, 32, 16, 16]
+        # [128, 64, 8, 8]
         return out
 
 
@@ -146,9 +201,9 @@ def test(net):
     total_params = 0
 
     for x in filter(lambda p: p.requires_grad, net.parameters()):
-        total_params += np.prod(x.detach().numpy().shape)
+        total_params += np.prod(x.data.numpy().shape)
     print("Total number of params", total_params)
-    print("Total layers", len(list(filter(lambda p: p.requires_grad and len(p.detach().size())>1, net.parameters()))))
+    print("Total layers", len(list(filter(lambda p: p.requires_grad and len(p.data.size())>1, net.parameters()))))
 
 
 if __name__ == "__main__":
