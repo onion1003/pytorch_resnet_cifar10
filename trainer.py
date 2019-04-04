@@ -11,6 +11,7 @@ import torch.utils.data
 import torchvision.transforms as transforms
 import torchvision.datasets as datasets
 import resnet
+from utils.logger import Logger
 
 device = torch.device('cuda:0')
 
@@ -39,7 +40,7 @@ parser.add_argument('--momentum', default=0.9, type=float, metavar='M',
                     help='momentum')
 parser.add_argument('--weight-decay', '--wd', default=1e-4, type=float,
                     metavar='W', help='weight decay (default: 5e-4)')
-parser.add_argument('--print-freq', '-p', default=50, type=int,
+parser.add_argument('--print-freq', '-p', default=1, type=int,
                     metavar='N', help='print frequency (default: 20)')
 parser.add_argument('--resume', default='', type=str, metavar='PATH',
                     help='path to latest checkpoint (default: none)')
@@ -59,7 +60,13 @@ best_prec1 = 0
 
 
 def main():
-    global args, best_prec1
+    global args, best_prec1, logger
+
+    log_dir = os.path.join('./logs', get_now())
+    if not os.path.exists(log_dir):
+        os.makedirs(log_dir)
+    logger = Logger(log_dir)
+
     args = parser.parse_args()
 
 
@@ -134,11 +141,16 @@ def main():
 
         # train for one epoch
         print('current lr {:.5e}'.format(optimizer.param_groups[0]['lr']))
-        train(train_loader, model, criterion, optimizer, epoch)
+        train_loss, train_top1 = train(train_loader, model, criterion, optimizer, epoch)
         lr_scheduler.step()
 
         # evaluate on validation set
         prec1 = validate(val_loader, model, criterion)
+
+        logger.scalar_summary('train_loss', train_loss, epoch)
+        logger.scalar_summary('train_top1', train_top1, epoch)
+        logger.scalar_summary('val_top1', prec1, epoch)
+        logger.writer.file_writer.flush()
 
         # remember best prec@1 and save checkpoint
         is_best = prec1 > best_prec1
@@ -211,6 +223,8 @@ def train(train_loader, model, criterion, optimizer, epoch):
                   'Prec@1 {top1.val:.3f} ({top1.avg:.3f})'.format(
                       epoch, i, len(train_loader), batch_time=batch_time,
                       data_time=data_time, loss=losses, top1=top1))
+
+    return losses.avg, top1.avg
 
 
 def validate(val_loader, model, criterion):
@@ -303,6 +317,10 @@ def accuracy(output, target, topk=(1,)):
         correct_k = correct[:k].view(-1).float().sum(0)
         res.append(correct_k.mul_(100.0 / batch_size))
     return res
+
+
+def get_now():
+    return str(time.strftime('%Y%m%d-%H:%M', time.localtime()))
 
 
 if __name__ == '__main__':
