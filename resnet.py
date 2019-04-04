@@ -31,6 +31,8 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.init as init
+import networkx as nx
+
 
 from torch.autograd import Variable
 
@@ -58,31 +60,33 @@ class SyncLayer(nn.Module):
         super(SyncLayer, self).__init__()
 
     def syc(self, x):
-        # x = x.cpu()
         k = 0.1
         p_size = x.shape[3]
         x = x.view(x.shape[0], x.shape[1], -1)
         n_pixel = x.shape[2]
         N = n_pixel * n_pixel
 
-        x_copy = x.clone().detach()
-        x_copy = x_copy.cuda()
-        for i in tqdm(range(n_pixel)):
-            tmp = torch.zeros(x_copy[:,:,i].size())
+        B = self.incidence_matrix(n_pixel).to(x)
+        x = x - k / N * torch.sin(torch.matmul(x, B)).matmul(B.t())
 
-            tmp = tmp.cuda()
-            # tmp = 0
-            for j in range(n_pixel):
-                if i != j:
-                    tmp +=  torch.sin(x[:,:,j]-x[:,:,i])
-            # tmp.detach()
-            print(tmp)
-            x_copy[:,:,i] = tmp*k/N
-        # x_copy.detach()
-        x = x_copy
+        # x_copy = torch.zeros(x.size()).to(x)
+        # for i in tqdm(range(n_pixel)):
+        #     tmp = 0
+        #     for j in range(n_pixel):
+        #         if i != j:
+        #             tmp += torch.sin(x[:, :, j] - x[:, :, i])
+        #     # print(tmp)
+        #     x_copy[:, :, i] = tmp*k/N
+        # x = x_copy
+
         x = x.view(x.shape[0], x.shape[1], p_size, p_size)
-        # x = x.cuda()
         return x
+
+    def incidence_matrix(self, size):
+        G = nx.complete_graph(size)
+        incidence_matrix = nx.incidence_matrix(G, oriented=True)
+        B = torch.tensor(incidence_matrix.todense()).float()
+        return B
 
     def forward(self, x):
         out = self.syc(x)
