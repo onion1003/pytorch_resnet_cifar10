@@ -32,7 +32,8 @@ import torch.nn as nn
 import torch.nn.functional as F
 import torch.nn.init as init
 import networkx as nx
-
+from itertools import combinations
+import random
 
 from torch.autograd import Variable
 
@@ -66,8 +67,10 @@ class SyncLayer(nn.Module):
         n_pixel = x.shape[2]
         N = n_pixel * n_pixel
 
-        B = self.incidence_matrix(n_pixel).to(x)
-        x = x - k / N * torch.sin(torch.matmul(x, B)).matmul(B.t())
+        B, degrees = self.incidence_matrix(n_pixel)
+        B = B.to(x)
+        degrees = degrees.to(x)
+        x = x - k / (degrees + 1) * torch.sin(x.matmul(B)).matmul(B.t())
 
         # x_copy = torch.zeros(x.size()).to(x)
         # for i in tqdm(range(n_pixel)):
@@ -83,10 +86,21 @@ class SyncLayer(nn.Module):
         return x
 
     def incidence_matrix(self, size):
-        G = nx.complete_graph(size)
+        # G = nx.complete_graph(size)
+
+        G = nx.DiGraph()
+        G.add_nodes_from(range(0, size))
+
+        edges = list(combinations(range(0, size), 2))
+        edges = random.sample(edges, int(len(edges) * 0.1))
+        G.add_edges_from(edges)
+
+        degrees = [x[1] for x in G.degree]
+
         incidence_matrix = nx.incidence_matrix(G, oriented=True)
         B = torch.tensor(incidence_matrix.todense()).float()
-        return B
+        degrees = torch.tensor(degrees).float()
+        return B, degrees
 
     def forward(self, x):
         out = self.syc(x)
