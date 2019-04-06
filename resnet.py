@@ -140,7 +140,7 @@ class BasicBlock(nn.Module):
         # print(x[:, :, ::2, ::2].shape)
         # print(x.shape)
         # print(out.shape)
-        out = self.sync(out)
+        # out = self.sync(out)
         out += self.shortcut(x)
 
         # print(out.shape)
