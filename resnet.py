@@ -60,17 +60,17 @@ class SyncLayer(nn.Module):
     def __int__(self):
         super(SyncLayer, self).__init__()
 
-    def syc(self, x):
-        k = 0.1
-        p_size = x.shape[3]
-        x = x.view(x.shape[0], x.shape[1], -1)
-        n_pixel = x.shape[2]
+    def syc(self, fx):
+        k = 1
+        p_size = fx.shape[3]
+        fx = fx.view(fx.shape[0], fx.shape[1], -1)
+        n_pixel = fx.shape[2]
         N = n_pixel * n_pixel
 
         B, degrees = self.incidence_matrix(n_pixel)
-        B = B.to(x)
-        degrees = degrees.to(x)
-        x = x - k / (degrees + 1) * torch.sin(x.matmul(B)).matmul(B.t())
+        B = B.to(fx)
+        degrees = degrees.to(fx)
+        fx = - k / (degrees + 1) * torch.sin(fx.matmul(B)).matmul(B.t())
 
         # x_copy = torch.zeros(x.size()).to(x)
         # for i in tqdm(range(n_pixel)):
@@ -82,8 +82,8 @@ class SyncLayer(nn.Module):
         #     x_copy[:, :, i] = tmp*k/N
         # x = x_copy
 
-        x = x.view(x.shape[0], x.shape[1], p_size, p_size)
-        return x
+        fx = fx.view(fx.shape[0], fx.shape[1], p_size, p_size)
+        return fx
 
     def incidence_matrix(self, size):
         # G = nx.complete_graph(size)
@@ -92,7 +92,7 @@ class SyncLayer(nn.Module):
         G.add_nodes_from(range(0, size))
 
         edges = list(combinations(range(0, size), 2))
-        edges = random.sample(edges, int(len(edges) * 0.1))
+        edges = random.sample(edges, int(len(edges) * 0.01))
         G.add_edges_from(edges)
 
         degrees = [x[1] for x in G.degree]
@@ -140,7 +140,7 @@ class BasicBlock(nn.Module):
         # print(x[:, :, ::2, ::2].shape)
         # print(x.shape)
         # print(out.shape)
-        # out = self.sync(out)
+        out = self.sync(out)
         out += self.shortcut(x)
 
         # print(out.shape)

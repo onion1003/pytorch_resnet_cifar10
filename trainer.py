@@ -22,7 +22,7 @@ model_names = sorted(name for name in resnet.__dict__
                      and callable(resnet.__dict__[name]))
 
 parser = argparse.ArgumentParser(description='Propert ResNets for CIFAR10 in pytorch')
-parser.add_argument('--arch', '-a', metavar='ARCH', default='resnet32',
+parser.add_argument('--arch', '-a', metavar='ARCH', default='resnet56',
                     choices=model_names,
                     help='model architecture: ' + ' | '.join(model_names) +
                     ' (default: resnet32)')
@@ -228,7 +228,7 @@ def train(train_loader, model, criterion, optimizer, epoch):
 
 
 def validate(val_loader, model, criterion):
-    with torch.no_grad:
+    with torch.no_grad():
         """
         Run evaluation
         """
